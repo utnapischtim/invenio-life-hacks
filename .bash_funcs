@@ -120,3 +120,14 @@ function bash_prompt() {
 }
 
 
+function gitBranchCdFirst() {
+  for dir
+  do
+    cd $dir
+    gitBranch
+    cd ..
+  done
+}
+
+alias ls-git='paste <( \ls -dlh --color=always */ ) <( gitBranchCdFirst */ )'
+
