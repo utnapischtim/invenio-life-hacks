@@ -67,6 +67,11 @@ function release() {
 
   git remote update
 
+  # check sed syntax to understand that completly
+  upstream_default="upstream/$(git remote show upstream | sed -n '/HEAD branch/s/.*: //p')"
+
+  git checkout $upstream_default
+  git pull
 
   # show last tag name
   git tag | tail -n 10
@@ -118,9 +123,6 @@ EOF
 
   # add release notes after =======
   sed -i "/=======/r /tmp/release-notes.txt" CHANGES.rst
-
-  # check sed syntax to understand that completly
-  upstream_default="upstream/$(git remote show upstream | sed -n '/HEAD branch/s/.*: //p')"
 
   # create branch with new tag name
   release_branch_name="rel-${tag_name//./-}"
