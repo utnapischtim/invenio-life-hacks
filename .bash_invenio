@@ -126,7 +126,13 @@ EOF
 
   # create branch with new tag name
   release_branch_name="rel-${tag_name//./-}"
-  git checkout -b $release_branch_name $upstream_default
+
+  if [[ $(echo "$(git checkout -b $release_branch_name $upstream_default)" | grep -c "error") -ne 0 ]]
+  then
+    echo "creating the release branch caused an error."
+    return
+  fi
+
 
   # update __version__ with the new tag
   local_pwd=$(pwd)
