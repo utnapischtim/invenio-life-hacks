@@ -45,6 +45,12 @@
   .scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th button {
+    background: none; border: 0; padding: 0; color: inherit;
+    font-weight: 600; cursor: pointer;
+  }
+  th[aria-sort="ascending"] button::after { content: " ▲"; font-size: .75em; }
+  th[aria-sort="descending"] button::after { content: " ▼"; font-size: .75em; }
   tbody tr:nth-child(even) { background: var(--row); }
   a { color: var(--accent); }
   .tag { font-variant-numeric: tabular-nums; }
@@ -69,12 +75,6 @@
     <label>Filter
       <input id="q" type="search" placeholder="repository name">
     </label>
-    <label>Sort by
-      <select id="sort">
-        <option value="name">Name</option>
-        <option value="date">Newest release first</option>
-      </select>
-    </label>
     <label class="inline"><input id="hideNone" type="checkbox"> hide repos without release</label>
     <label class="inline"><input id="hideArchived" type="checkbox"> hide archived</label>
   </div>
@@ -83,7 +83,11 @@
 
   <div class="scroll">
     <table id="table" hidden>
-      <thead><tr><th>Repository</th><th>Latest release</th><th>Published</th></tr></thead>
+      <thead><tr>
+        <th data-key="name" aria-sort="none"><button type="button">Repository</button></th>
+        <th data-key="tag" aria-sort="none"><button type="button">Latest release</button></th>
+        <th data-key="date" aria-sort="none"><button type="button">Published</button></th>
+      </tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -94,6 +98,8 @@
 
 const $ = (id) => document.getElementById(id);
 let repos = []; // [{name, url, archived, tag, tagUrl, date}]
+let sortKey = "name"; // "name" | "tag" | "date"
+let sortDir = 1;      // 1 = ascending, -1 = descending
 
 /** Fetch via GraphQL (needs token). Returns the normalised repo list. */
 async function loadGraphQL(org, token) {
@@ -178,10 +184,21 @@ function render() {
     !($("hideNone").checked && !r.tag) &&
     !($("hideArchived").checked && r.archived));
 
-  if ($("sort").value === "date") {
-    view.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  } else {
-    view.sort((a, b) => a.name.localeCompare(b.name));
+  // Repos without a value in the sorted column always go last.
+  const compare = {
+    name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }),
+    tag: (a, b) => a.tag.localeCompare(b.tag, undefined, { numeric: true }),
+    date: (a, b) => a.date.localeCompare(b.date),
+  }[sortKey];
+  view.sort((a, b) => {
+    const missingA = !a[sortKey], missingB = !b[sortKey];
+    if (missingA || missingB) return (missingA - missingB) || a.name.localeCompare(b.name);
+    return compare(a, b) * sortDir;
+  });
+
+  for (const th of document.querySelectorAll("th[data-key]")) {
+    th.setAttribute("aria-sort",
+      th.dataset.key !== sortKey ? "none" : sortDir === 1 ? "ascending" : "descending");
   }
 
   const rows = $("rows");
@@ -221,8 +238,23 @@ $("form").addEventListener("submit", async (ev) => {
   }
 });
 
-for (const id of ["q", "sort", "hideNone", "hideArchived"]) {
+for (const id of ["q", "hideNone", "hideArchived"]) {
   $(id).addEventListener("input", render);
+}
+
+// Click a column header to sort by it; click again to reverse the order.
+// Dates start with the newest release first, other columns start ascending.
+for (const th of document.querySelectorAll("th[data-key]")) {
+  th.querySelector("button").addEventListener("click", () => {
+    const key = th.dataset.key;
+    if (key === sortKey) {
+      sortDir = -sortDir;
+    } else {
+      sortKey = key;
+      sortDir = key === "date" ? -1 : 1;
+    }
+    render();
+  });
 }
 </script>
 </body>
